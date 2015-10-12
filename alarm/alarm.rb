@@ -9,7 +9,7 @@ stream = PacketFu::Capture.new(:start => true, :iface => 'eth0', :promisc => tru
 $num_incidents = 1
 def report_incident(type, source, protocol, payload)
     payload = payload.each_byte.map { |b| sprintf("0x%02X ",b) }.join
-    puts "#{$num_incidents}. ALERT: #{type} is detected from #{source}"
+    puts "#{$num_incidents}. ALERT: #{type} is detected from #{source}" +
         " (#{protocol}) (#{payload})!\n"
     $num_incidents += 1
 end
@@ -50,16 +50,15 @@ stream.stream.each do |raw_data|
         elsif is_xmas_scan? packet
             report_incident("XMAS scan", packet.ip_saddr, "TCP", packet.payload)
         else
-            print packet.payload
+
         end
         find_credit_cards_in packet
-        puts "TCP\n"
     elsif packet.class == PacketFu::IPPacket
-        puts "IP\n"
+
     elsif packet.class == PacketFu::UDPPacket
-        puts "UDP\n"
+
     elsif packet.class == PacketFu::EthPacket
-        puts "ETH\n"
+
     end
 end
 
