@@ -24,7 +24,7 @@ end
 
 $num_incidents = 1
 def report_incident(type, source, protocol, payload)
-    #payload = payload.each_byte.map { |b| sprintf("0x%02X ",b) }.join
+    ### payload = payload.each_byte.map { |b| sprintf("0x%02X ",b) }.join
     puts "#{$num_incidents}. ALERT: #{type} is detected from #{source}" +
         " (#{protocol}) (#{payload})!\n"
     $num_incidents += 1
@@ -48,11 +48,13 @@ def is_xmas_scan?(packet)
 end
 
 def is_nmap_scan?(packet)
-    packet.payload.scan("\x4E\x6D\x61\x70").length > 0
+    nmap_in_hex = /\x4E\x6D\x61\x70/
+    packet.payload.scan(nmap_in_hex).length > 0
 end
 
 def is_nikto_scan?(packet)
-    packet.payload.scan("Nikto").length > 0
+    nikto_in_hex = /(\x6e|\x4e)\x69\x6b\x74\x6f/
+    packet.payload.scan(nikto_in_hex).length > 0
 end
 
 def is_credit_card_leak?(packet)
@@ -78,9 +80,9 @@ def analyze_stream()
             elsif is_nikto_scan? packet
                 report_incident("Nikto scan", packet.ip_saddr, "TCP", packet.payload)
             elsif is_credit_card_leak? packet
-                report_incident("Credit card leak", packet.saddr, "HTTP", packet.payload)
+                report_incident("Credit card leak", packet.ip_saddr, "HTTP", packet.payload)
             else
-                
+                print packet.payload
             end
         elsif packet.class == PacketFu::IPPacket
 
@@ -101,18 +103,18 @@ def analyze_log(log)
             request = match[9]
             ip = match[1]
             match.captures.each do |m|
-                if m.scan(/phpmyadmin/i).length > 0
-                    report_incident("phpmyadmin violation", ip, "HTTP", m)
+                if m.scan(/nmap/i).length > 0
+                    report_incident("Nmap scan", ip, "HTTP", request)
+                elsif m.scan(/nikto/i).length > 0
+                    report_incident("Nikto scan", ip, "HTTP", request)
                 elsif m.scan(/(\\x0?...?){10,}/).length > 0
                     report_incident("Potential shellcode", ip, "HTTP", m)
                 elsif m.scan(/masscan/i).length > 0
                     report_incident("masscan", ip, "HTTP", m)
                 elsif m.scan(/\(.*\)\s*\{.*\};\s*\S+\s+\S+/).length > 0
                     report_incident("Potential shellshock scan", ip, "HTTP", m)
-                elsif m.scan(/nmap/i).length > 0
-                    report_incident("Nmap scan", ip, "HTTP", request)
-                elsif m.scan(/nikto/i).length > 0
-                    report_incident("Nikto scan", ip, "HTTP", request)
+                elsif m.scan(/phpmyadmin/i).length > 0
+                    report_incident("phpmyadmin violation", ip, "HTTP", m)
                 end
             end
         end
