@@ -105,12 +105,14 @@ def analyze_log(log)
                     report_incident("phpmyadmin violation", ip, "HTTP", m)
                 elsif m.scan(/(\\x0?...?){10,}/).length > 0
                     report_incident("Potential shellcode", ip, "HTTP", m)
+                elsif m.scan("masscan").length > 0
+                    report_incident("masscan", ip, "HTTP", m)
+                elsif m.scan(/\(.*\)\s*\{.*\};\s*\S+\s+\S+/).length > 0
+                    report_incident("Potential shellshock scan", ip, "HTTP", m)
                 elsif m.scan("Nmap").length > 0
                     #report_incident("Nmap scan", ip, "HTTP", request)
                 elsif m.scan("nikto").length > 0
                     report_incident("Nikto scan", ip, "HTTP", request)
-                elsif m.scan("masscan").length > 0
-                    report_incident("masscan", ip, "HTTP", m)
                 end
             end
         end
