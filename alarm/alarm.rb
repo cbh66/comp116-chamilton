@@ -1,14 +1,30 @@
 require 'packetfu'
 
 
+def help()
+    puts "Usage: ruby #{__FILE__} [filename] \n"
+end
 
-stream = PacketFu::Capture.new(:start => true, :iface => 'eth0', :promisc => true)
-
+def main(argv)
+    i = 0
+    while i < argv.length
+        case argv[i]
+        when "-h"
+            help
+            return        
+        else
+            File.open(argv[i], "r") do |f| analyze_log f end
+            return
+        end
+        i += 1
+    end
+    analyze_stream
+end
 
 
 $num_incidents = 1
 def report_incident(type, source, protocol, payload)
-    payload = payload.each_byte.map { |b| sprintf("0x%02X ",b) }.join
+    #payload = payload.each_byte.map { |b| sprintf("0x%02X ",b) }.join
     puts "#{$num_incidents}. ALERT: #{type} is detected from #{source}" +
         " (#{protocol}) (#{payload})!\n"
     $num_incidents += 1
@@ -31,35 +47,76 @@ def is_xmas_scan?(packet)
         flags.fin != 0 and flags.psh != 0 and flags.urg != 0
 end
 
-def find_credit_cards_in(packet)
-    if packet.payload =~ /4\d{3}(\s|-)?\d{4}(\s|-)?\d{4}(\s|-)?\d{4}/ or
-       packet.payload =~ /5\d{3}(\s|-)?\d{4}(\s|-)?\d{4}(\s|-)?\d{4}/ or
-       packet.payload =~ /6011(\s|-)?\d{4}(\s|-)?\d{4}(\s|-)?\d{4}/ or
-       packet.payload =~ /3\d{3}(\s|-)?\d{6}(\s|-)?\d{5}/
-        report_incident("Credit card leak", packet.saddr, "HTTP", packet.payload)
-    end
+def is_nmap_scan?(packet)
+    packet.payload.scan("\x4E\x6D\x61\x70").length > 0
 end
 
-stream.stream.each do |raw_data|
-    packet = PacketFu::Packet.parse raw_data
-    if packet.class == PacketFu::TCPPacket
-        if is_null_scan? packet
-            report_incident("NULL scan", packet.ip_saddr, "TCP", packet.payload)
-        elsif is_fin_scan? packet
-            report_incident("FIN scan", packet.ip_saddr, "TCP", packet.payload)
-        elsif is_xmas_scan? packet
-            report_incident("XMAS scan", packet.ip_saddr, "TCP", packet.payload)
-        else
+def is_nikto_scan?(packet)
+    packet.payload.scan("Nikto").length > 0
+end
+
+def is_credit_card_leak?(packet)
+    packet.payload =~ /4\d{3}(\s|-)?\d{4}(\s|-)?\d{4}(\s|-)?\d{4}/ or
+    packet.payload =~ /5\d{3}(\s|-)?\d{4}(\s|-)?\d{4}(\s|-)?\d{4}/ or
+    packet.payload =~ /6011(\s|-)?\d{4}(\s|-)?\d{4}(\s|-)?\d{4}/ or
+    packet.payload =~ /3\d{3}(\s|-)?\d{6}(\s|-)?\d{5}/
+end
+
+def analyze_stream()
+    stream = PacketFu::Capture.new(:start => true, :iface => 'eth0', :promisc => true)
+    stream.stream.each do |raw_data|
+        packet = PacketFu::Packet.parse raw_data
+        if packet.class == PacketFu::TCPPacket
+            if is_null_scan? packet
+                report_incident("NULL scan", packet.ip_saddr, "TCP", packet.payload)
+            elsif is_fin_scan? packet
+                report_incident("FIN scan", packet.ip_saddr, "TCP", packet.payload)
+            elsif is_xmas_scan? packet
+                report_incident("XMAS scan", packet.ip_saddr, "TCP", packet.payload)
+            elsif is_nmap_scan? packet
+                report_incident("Nmap scan", packet.ip_saddr, "TCP", packet.payload)
+            elsif is_nikto_scan? packet
+                report_incident("Nikto scan", packet.ip_saddr, "TCP", packet.payload)
+            elsif is_credit_card_leak? packet
+                report_incident("Credit card leak", packet.saddr, "HTTP", packet.payload)
+            else
+                
+            end
+        elsif packet.class == PacketFu::IPPacket
+
+        elsif packet.class == PacketFu::UDPPacket
+
+        elsif packet.class == PacketFu::EthPacket
 
         end
-        find_credit_cards_in packet
-    elsif packet.class == PacketFu::IPPacket
-
-    elsif packet.class == PacketFu::UDPPacket
-
-    elsif packet.class == PacketFu::EthPacket
-
     end
 end
 
+
+def analyze_log(log)
+    log.each_line do |line|
+        regex = /(\S+)\s+(\S+)\s+(\S+)\s+(\[.*?\])\s+(".*?")\s+(\d+)\s+(\d+)\s+("\S+")\s+(".*?")/
+        match = regex.match(line)
+        if match
+            request = match[5]
+            ip = match[0]
+            match.captures.each do |m|
+                if false and m.scan("phpmyadmin").length > 0
+                    report_incident("phpmyadmin violation", ip, "TCP", request)
+                elsif m.scan("Nmap").length > 0
+                    #report_incident("Nmap scan", ip, "TCP", request)
+                elsif m.scan("nikto").length > 0
+                    report_incident("Nikto scan", ip, "TCP", request)
+                elsif m.scan("masscan").length > 0
+                    report_incident("masscan", ip, "TCP", request)
+                end
+            end
+        end
+    end
+end
+
+
+if __FILE__ == $0
+    main(ARGV)
+end
 
