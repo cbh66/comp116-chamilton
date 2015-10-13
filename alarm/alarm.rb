@@ -11,7 +11,7 @@ def main(argv)
         case argv[i]
         when "-h"
             help
-            return        
+            return 
         else
             File.open(argv[i], "r") do |f| analyze_log f end
             return
@@ -101,17 +101,17 @@ def analyze_log(log)
             request = match[9]
             ip = match[1]
             match.captures.each do |m|
-                if m.scan("phpmyadmin").length > 0
+                if m.scan(/phpmyadmin/i).length > 0
                     report_incident("phpmyadmin violation", ip, "HTTP", m)
                 elsif m.scan(/(\\x0?...?){10,}/).length > 0
                     report_incident("Potential shellcode", ip, "HTTP", m)
-                elsif m.scan("masscan").length > 0
+                elsif m.scan(/masscan/i).length > 0
                     report_incident("masscan", ip, "HTTP", m)
                 elsif m.scan(/\(.*\)\s*\{.*\};\s*\S+\s+\S+/).length > 0
                     report_incident("Potential shellshock scan", ip, "HTTP", m)
-                elsif m.scan("Nmap").length > 0
-                    #report_incident("Nmap scan", ip, "HTTP", request)
-                elsif m.scan("nikto").length > 0
+                elsif m.scan(/nmap/i).length > 0
+                    report_incident("Nmap scan", ip, "HTTP", request)
+                elsif m.scan(/nikto/i).length > 0
                     report_incident("Nikto scan", ip, "HTTP", request)
                 end
             end
