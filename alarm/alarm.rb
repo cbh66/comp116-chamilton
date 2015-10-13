@@ -95,20 +95,22 @@ end
 
 def analyze_log(log)
     log.each_line do |line|
-        regex = /(\S+)\s+(\S+)\s+(\S+)\s+(\[.*?\])\s+(".*?")\s+(\d+)\s+(\d+)\s+("\S+")\s+(".*?")/
+        regex = /(\d+\.\d+\.\d+\.\d+)\s+(\S+)\s+(\S+)\s+(\[.*?\])\s+(".*?")\s+(\d+)\s+(\d+)\s+("\S+")\s+(".*?")/
         match = regex.match(line)
         if match
-            request = match[5]
-            ip = match[0]
+            request = match[9]
+            ip = match[1]
             match.captures.each do |m|
-                if false and m.scan("phpmyadmin").length > 0
-                    report_incident("phpmyadmin violation", ip, "TCP", request)
+                if m.scan("phpmyadmin").length > 0
+                    report_incident("phpmyadmin violation", ip, "HTTP", m)
+                elsif m.scan(/(\\x0?...?){10,}/).length > 0
+                    report_incident("Potential shellcode", ip, "HTTP", m)
                 elsif m.scan("Nmap").length > 0
-                    #report_incident("Nmap scan", ip, "TCP", request)
+                    #report_incident("Nmap scan", ip, "HTTP", request)
                 elsif m.scan("nikto").length > 0
-                    report_incident("Nikto scan", ip, "TCP", request)
+                    report_incident("Nikto scan", ip, "HTTP", request)
                 elsif m.scan("masscan").length > 0
-                    report_incident("masscan", ip, "TCP", request)
+                    report_incident("masscan", ip, "HTTP", m)
                 end
             end
         end
