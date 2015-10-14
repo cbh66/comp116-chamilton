@@ -2,7 +2,7 @@ require 'packetfu'
 
 
 def help()
-    puts "Usage: ruby #{__FILE__} [filename] \n"
+    puts "Usage: ruby #{__FILE__} [[-r] filename] \n"
 end
 
 def main(argv)
@@ -11,7 +11,9 @@ def main(argv)
         case argv[i]
         when "-h"
             help
-            return 
+            return
+        when "-r"
+            # Do nothing, read file as next argument.
         else
             File.open(argv[i], "r") do |f| analyze_log f end
             return
